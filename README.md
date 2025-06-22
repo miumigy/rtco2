@@ -4,6 +4,8 @@ A single-page web application that lets you **compare land, sea, and air transpo
 Built with Leaflet, Turf.js, and public routing / geocoding APIs, the simulator is completely client-side—no backend required.
 > **Methodology:** Emission factors and calculation logic follow the **Global Logistics Emissions Council (GLEC) Framework v3.4** (2024) guidance for *default* intensity values and tonne-kilometre aggregation.
 
+https://github.com/user-attachments/assets/8cf9e453-e4c3-4ab5-a893-1adaa2ae9a40
+
 ---
 
 ## Features
