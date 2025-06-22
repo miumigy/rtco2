@@ -82,3 +82,10 @@ Each successful search appends (or updates) a row in an in-memory log:
 
 ## License
 Released under the MIT License. See [LICENSE](https://github.com/miumigy/rtco2/blob/main/LICENSE) for details.
+
+---
+
+## Author & Acknowledgements
+- Questions or suggestions? Feel free to open an issue or contact the author via GitHub.
+- Huge thanks to OpenStreetMap contributors and the maintainers of OSRM, Turf.js, and the open data sets that make this tool possible.
+- The GLEC Framework is © Smart Freight Centre and used here under its open guidance.
