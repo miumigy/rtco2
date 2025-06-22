@@ -29,7 +29,7 @@ Built with Leaflet, Turf.js, and public routing / geocoding APIs, the simulator 
 |--------------|-------------------------------------------------------------------|
 | Maps & UI    | [Leaflet 1.9](https://leafletjs.com) + OpenStreetMap tiles         |
 | Geodesics    | Native JS great-circle helper + [Turf.js 6](https://turfjs.org)    |
-| Geo-routing  | **Land:** OSRM demo server<br>**Sea:** great-circle interpolation (IMO shipping-lane GeoJSON only drawed)<br>**Air:** great-circle interpolation |
+| Geo-routing  | **Land:** OSRM demo server<br>**Sea:** great-circle interpolation (IMO shipping-lane GeoJSON is only displayed)<br>**Air:** great-circle interpolation |
 | Geo-coding   | [Nominatim (OSM)](https://nominatim.openstreetmap.org)             |
 | Data sets    | UN/LOCODE ports, world shipping lanes, airports JSON (mwgg)        |
 | Tooling      | No build step—vanilla HTML/CSS/JS                                  |
@@ -85,7 +85,12 @@ Released under the MIT License. See [LICENSE](https://github.com/miumigy/rtco2/b
 
 ---
 
-## Author & Acknowledgements
-- Questions or suggestions? Feel free to open an issue or contact the author via GitHub.
+## Acknowledgements
 - Huge thanks to OpenStreetMap contributors and the maintainers of OSRM, Turf.js, and the open data sets that make this tool possible.
 - The GLEC Framework is © Smart Freight Centre and used here under its open guidance.
+
+---
+
+## Contact to Author
+Questions or suggestions?
+Feel free to open an issue or contact the author via GitHub.
