@@ -29,7 +29,7 @@ Built with Leaflet, Turf.js, and public routing / geocoding APIs, the simulator 
 |--------------|-------------------------------------------------------------------|
 | Maps & UI    | [Leaflet 1.9](https://leafletjs.com) + OpenStreetMap tiles         |
 | Geodesics    | Native JS great-circle helper + [Turf.js 6](https://turfjs.org)    |
-| Geo-routing  | **Land:** OSRM demo server<br>**Sea:** IMO shipping-lane GeoJSON<br>**Air:** great-circle interpolation |
+| Geo-routing  | **Land:** OSRM demo server<br>**Sea:** great-circle interpolation (IMO shipping-lane GeoJSON only drawed)<br>**Air:** great-circle interpolation |
 | Geo-coding   | [Nominatim (OSM)](https://nominatim.openstreetmap.org)             |
 | Data sets    | UN/LOCODE ports, world shipping lanes, airports JSON (mwgg)        |
 | Tooling      | No build step—vanilla HTML/CSS/JS                                  |
