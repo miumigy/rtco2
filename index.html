@@ -3,68 +3,41 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Simple Land / Sea / Air Route + CO₂ Emissions Calculator</title>
+  <title>Simple Land / Sea / Air Route + CO₂ Emissions Calculator</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
+    /* -------------- styling unchanged -------------- */
     *{box-sizing:border-box}
-    html,body{
-      margin:0;padding:0;height:100%;
-      font-family:sans-serif;display:flex;flex-direction:column;
-    }
+    html,body{margin:0;padding:0;height:100%;font-family:sans-serif;display:flex;flex-direction:column}
     h1{text-align:center;margin:12px 0 4px;font-size:1.25rem}
-    #controls{
-      background:#fff;padding:8px;display:flex;flex-direction:column;gap:8px;
-      box-shadow:0 2px 8px rgba(0,0,0,.15);max-height:30vh;overflow-y:auto;flex-shrink:0;
-    }
+    #controls{background:#fff;padding:8px;display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.15);max-height:30vh;overflow-y:auto;flex-shrink:0}
     #cargoPanel{display:flex;gap:4px;align-items:center}
-    #cargoPanel input{
-      flex:1;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:.95rem;
-    }
-    #cargoPanel select{
-      width:100px;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:.95rem;
-    }
+    #cargoPanel input{flex:1;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:.95rem}
+    #cargoPanel select{width:100px;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:.95rem}
     .row{display:flex;gap:8px}
-    .group{
-      background:#f9f9f9;border:1px solid #ddd;border-radius:6px;
-      padding:8px;display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;
-    }
-    .group input{
-      padding:6px 8px;font-size:.95rem;border:1px solid #ccc;border-radius:4px;
-    }
+    .group{background:#f9f9f9;border:1px solid #ddd;border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+    .group input{padding:6px 8px;font-size:.95rem;border:1px solid #ccc;border-radius:4px}
     #buttons{display:flex;gap:6px;flex-wrap:wrap;width:100%}
-    #buttons button{
-      flex:1;background:#0074d9;color:#fff;border:none;border-radius:4px;
-      padding:8px 0;font-size:.95rem;line-height:1.2;text-align:center;cursor:pointer;
-    }
+    #buttons button{flex:1;background:#0074d9;color:#fff;border:none;border-radius:4px;padding:8px 0;font-size:.95rem;line-height:1.2;text-align:center;cursor:pointer}
     #buttons button:hover{background:#005fa3}
     #downloadCsv[disabled]{background:#999;cursor:not-allowed}
-    #results{
-      margin-left:auto;display:flex;gap:12px;align-items:center;
-    }
+    #results{margin-left:auto;display:flex;gap:12px;align-items:center}
     .stat{font-weight:bold;font-size:.95rem;color:#222}
     #map{flex:1;min-height:0}
-    #spinnerOverlay{
-      display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);
-      align-items:center;justify-content:center;z-index:2000;
-    }
+    #spinnerOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);align-items:center;justify-content:center;z-index:2000}
     @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-    #spinner{
-      width:48px;height:48px;border:6px solid #eee;border-top-color:#0074d9;
-      border-radius:50%;animation:spin 1s linear infinite;
-    }
+    #spinner{width:48px;height:48px;border:6px solid #eee;border-top-color:#0074d9;border-radius:50%;animation:spin 1s linear infinite}
   </style>
 </head>
 <body>
   <div id="spinnerOverlay"><div id="spinner"></div></div>
   <h1>Simple Transportation Route &amp; CO₂e Calculator</h1>
 
-  <!-- ────────── Controls ────────── -->
+  <!-- -------- Controls -------- -->
   <div id="controls">
     <div id="cargoPanel">
       <input id="cargoAmount" type="number" placeholder="Cargo amount" min="0" step="any"/>
-      <select id="cargoUnit">
-        <option value="ton">Ton</option><option value="teu">TEU</option>
-      </select>
+      <select id="cargoUnit"><option value="ton">Ton</option><option value="teu">TEU</option></select>
     </div>
 
     <div class="row">
@@ -95,107 +68,84 @@
 
   <div id="map"></div>
 
-  <!-- libs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
   <script>
   window.addEventListener('DOMContentLoaded',()=>{
 
-    /* ───────── Spinner helpers ───────── */
+    /* ---------- Spinner helpers ---------- */
     const ov=document.getElementById('spinnerOverlay'),
           show=()=>ov.style.display='flex',
           hide=()=>ov.style.display='none',
           withSpin=fn=>async()=>{show();try{await fn()}catch(e){alert(e)}finally{hide()}};
 
-    /* ───────── Map init ───────── */
+    /* ---------- Map ---------- */
     const map=L.map('map',{center:[20,0],zoom:2,worldCopyJump:true});
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      {attribution:'© OpenStreetMap contributors'}).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(map);
     map.doubleClickZoom.disable();
 
-    /* ───────── Layers ───────── */
-    const layers={
-      seaPort:L.layerGroup().addTo(map),
-      lane:L.layerGroup().addTo(map),
-      airport:L.layerGroup().addTo(map),
-      land1:L.layerGroup().addTo(map),
-      seaRoute:L.layerGroup().addTo(map),
-      airRoute:L.layerGroup().addTo(map),
-      landRoute:L.layerGroup().addTo(map),
-      land2:L.layerGroup().addTo(map),
-      origDest:L.layerGroup().addTo(map)
-    };
+    /* ---------- Layers ---------- */
+    const layers={seaPort:L.layerGroup().addTo(map),lane:L.layerGroup().addTo(map),airport:L.layerGroup().addTo(map),
+      land1:L.layerGroup().addTo(map),seaRoute:L.layerGroup().addTo(map),airRoute:L.layerGroup().addTo(map),
+      landRoute:L.layerGroup().addTo(map),land2:L.layerGroup().addTo(map),origDest:L.layerGroup().addTo(map)};
 
-    /* ───────── UI refs ───────── */
-    const cargoIn=document.getElementById('cargoAmount'),
-          cargoUnit=document.getElementById('cargoUnit'),
-          origIn=document.getElementById('origAddr'),
-          origCode=document.getElementById('origCode'),
-          destIn=document.getElementById('destAddr'),
-          destCode=document.getElementById('destCode'),
-          lblOrig=document.getElementById('nearestOrig'),
-          lblDest=document.getElementById('nearestDest'),
-          landBtn=document.getElementById('landBtn'),
-          seaBtn=document.getElementById('seaBtn'),
-          airBtn=document.getElementById('airBtn'),
-          clearWp=document.getElementById('clearWaypoints'),
-          distEl=document.getElementById('distance'),
-          emisEl=document.getElementById('emissions'),
-          downloadBtn=document.getElementById('downloadCsv');
+    /* ---------- UI refs ---------- */
+    const cargoIn=document.getElementById('cargoAmount'),cargoUnit=document.getElementById('cargoUnit'),
+          origIn=document.getElementById('origAddr'),origCode=document.getElementById('origCode'),
+          destIn=document.getElementById('destAddr'),destCode=document.getElementById('destCode'),
+          lblOrig=document.getElementById('nearestOrig'),lblDest=document.getElementById('nearestDest'),
+          landBtn=document.getElementById('landBtn'),seaBtn=document.getElementById('seaBtn'),airBtn=document.getElementById('airBtn'),
+          clearWp=document.getElementById('clearWaypoints'),distEl=document.getElementById('distance'),
+          emisEl=document.getElementById('emissions'),downloadBtn=document.getElementById('downloadCsv');
 
-    /* ───────── Constants ───────── */
-    const EF_ROAD=0.062,EF_SEA=0.016,EF_AIR=0.500;   // t-CO₂ per ton-km
+    /* ---------- Constants ---------- */
+    const EF_ROAD=0.062,EF_SEA=0.016,EF_AIR=0.500;
     const WPI_URL='https://raw.githubusercontent.com/marchah/sea-ports/master/lib/ports.json',
           LANE_URL='https://raw.githubusercontent.com/newzealandpaul/Shipping-Lanes/main/data/Shipping_Lanes_v1.geojson',
           AIR_URL='https://raw.githubusercontent.com/mwgg/Airports/master/airports.json';
-    const TARGET_WPI=['AEAUH','AERUW','AEKLF','AEMKH','AEKHL','AEQIW','AGSJO','ARBHI','ARBUE','ARMDQ','ARPUD','ARPMY','ARROS','ARSAE','ARUSH','ARZAE','ASPPG','AUADL','AUBNE','AUDRW','AUMEL','AUSYD','AWBAR','BDCGP','BEANR','BEGNE','BEZEE','BHMIN','BQKRA','BRIGI','BRIOA','BRNVT','BRPNG','BRPEC','BRRIO','BRMCP','BRSSZ','BRSLZ','BRVIX','BSNAS','BZBGK','CANWP','CASJB','CASJF','CDBNW','CGPNR','CIABJ','CISPY','CLANF','CLARI','CLCNL','CLIQQ','CLLQN','CLMJS','CLPAG','CLPUQ','CLSAI','CLSVE','CLVAP','CNCFD','CNDCB','CNDGG','CNDJK','CNFQG','CNHUI','CNHMN','CNJGY','CNJNZ','CNLYG','CNNSA','CNNTG','CNSHP','CNQZJ','CNRZH','CNSHK','CNSHD','CNWIH','CNWEF','CNWEI','CNYPG','CNYTN','CNYIK','CNZJG','CNZZU','CNZUH','COLET','COTLU','COTRB','CRCAL','CRMOB','CRLIO','CUMAR','CVMIN','CWWIL','CXFFC','CYLMS','DEBKE','DECUX','DEEME','DEKEL','DERSK','DEWVN','DKAAR','DKCPH','DOCAU','DOMAN','DZALG','DZAZW','DZGHZ','ECESM','ECGYE','ECPSJ','ECPBO','EEKND','EEMUG','EEPLA','EETLL','EGDAM','EGALY','EGSOK','ERMSW','ESLEI','ESBIO','ESCAR','ESCAS','ESFRO','ESGIJ','ESACE','ESLPA','ESAGP','ESMLN','ESSAG','ESSPC','ESVIL','FITKU','FITKU','FIPOR','FIPOR','FIHMN','FIHMN','FIPRS','FIPRS','FIKOK','FIKOK','FIKEM','FIKEM','FIKTK','FIRAU','FIRAU','FITOR','FITOR','FJLTK','FJSUV','FOKOL','FOTHO','FRBAS','FRBES','FRDKK','FRFOS','FRLPE','FRLRH','FRLEH','FRMRS','FRMTX','FRPOV','FRRAD','FRURO','FRSET','FRTLN','GBABD','GBBEL','GBGRG','GBGRK','GBHUL','GBIMM','GBLIV','GBLGP','GBTEE','GBTYN','GFDDC','GLGOH','GPPTP','GRHER','GRHER','GRPIR','GRSKG','GRVOL','GTSTC','GUPIT','GWOXB','HRPLE','HRRJK','HRSPU','HTCAP','HTLFF','IDBPN','IDBTM','IDBEN','IDBOA','IDJKT','IDDJJ','IDKUM','IDMAK','IDPDG','IDPER','IDSRG','IDSUB','IDTNJ','IDTMK','IDTUA','IEWAT','ILHFA','INMAA','INCOK','INHZR','INIXY','INKTP','INCCU','INMRM','INMRM','INBOM','INPRT','INPAV','INTUT','INVTZ','IQUQR','IRASA','IRBND','IRBKM','IRBUZ','ISREY','ITAOI','ITBRI','ITCAG','ITCTA','ITCVV','ITGOA','ITGIT','ITSPE','ITLIV','ITNAP','ITOLB','ITPMO','ITSVN','ITTPS','ITVDL','ITVCE','JOAQJ','JPHTD','JPISS','JPKKJ','JPUKB','JPMJR','JPMOJ','JPOSA','JPSEN','JPTYO','JPYOK','KHKOS','KMMUT','KNCHA','KRPUS','KRTSN','KRTJI','KRKUV','KRKAN','KRINC','KRMAS','KRMOK','KRKPO','KRPTK','KRUSN','KWSAA','KWSWK','KYGEC','LBBEY','LCCAS','LKCMB','LRMLW','LYKHO','MACAS','MDGIU','MEBAR','MGEHL','MGNOS','MHMAJ','MMTLA','MMTLA','MTMAR','MUPMA','MVMLE','MXATM','MXCOA','MXESE','MXGYM','MXLZC','MXZLO','MXMZT','MXPRO','MXPMD','MXPMS','MXTAM','MXTUX','MXVER','MYPEN','MYPKG','MYTPP','NALUD','NCNOU','NCNOU','NGLKK','NGONN','NIRAM','NLAMS','NLBOT','NLIJM','NLMOE','NLRTM','NLTNZ','NLVLI','NOAES','NOARD','NOAVE','NOBGO','NOBOO','NOBVK','NODRM','NOEGE','NOFRO','NOFRK','NOFUS','NOGLO','NOHFT','NOHRD','NOHAU','NOHVI','NOHLA','NOHYR','NOHOY','NOIKR','NOKRS','NOLAR','NOMAY','NOMOL','NOMJF','NOMSS','NOODD','NOORK','NOOSL','NOSAT','NOSVG','NOSKN','NOSUN','NOSVE','NOSVJ','NOTAE','NOTOS','NOTRD','NRINU','NZAKL','NZBLU','NZLYT','NZMAP','NZNPE','NZNSN','NZPOE','NZTRG','NZTIU','NZWLG','PAONX','PACTB','PAPTY','PAROD','PFBOB','PFPPT','PGMAG','PGMTK','PHBTG','PHGES','PHTGO','PLGDY','PLSWI','PRSJU','PTCNL','PTFDF','PTHOR','PTLEI','PTLIS','PTPIC','PTPDL','PTPXO','PTPRG','PTPRV','PTSCF','PTSET','PTSIE','PTVEL','PTVDP','PYASU','QAHMD','QAMES','ROCND','RUBRK','RUNVS','RULED','RUULU','RUVYP','RUZAR','SADMM','SAJED','SAKAC','SAYNB','SEAHU','SEGVX','SEGOT','SEHAD','SEKSD','SENRK','SEOSK','SEOXE','SEPIT','SESOE','SESTO','SESDL','SEUME','SEVST','SYLTK','SYTTS','THBKK','THLCH','THHKT','THSCS','TLDIL','TOTBU','TRPAM','TRAYT','TRBDM','TRELI','TREYP','TRGEB','TRGEM','TRISK','TRIZM','TRIZT','TRKMX','TRLMA','TRMAD','TRMER','TRSSX','TRTEK','TRTZX','TRYPO','TTPOS','TTPOS','TWTPE','TZDAR','UAILK','UAODS','UAYUZ','USBAL','USACL','USEPI','USFEB','USGFP','USHNL','USHKA','USLGB','USNYC','USNFF','USKND','USPDP','USPEF','USNTD','USPME','USSAN','USSCK','USILM','UYPTP','VCKTN','VEPLA','VICTD','VNC8Q','VNDAD','VNSGN','VNNGH','VNUIH','VNVUT','WFFUT','YTLON','ZACPT','ZAZBA','ZADUR','AEAJM','AEJEA','AIAXA','ALDRZ','ALDRZ','AOCAB','AOLOB','AOLAD','AOMAL','AOMSZ','AOSZA','AUBEL','AUBWT','AUCNS','AUDAM','AUDPO','AUFRE','AUGEX','AUNTL','AUPBT','AUPKL','AUTSV','AUWEI','AWORJ','BBBGI','BDMGL','BGBOJ','BGVAR','BJCOO','BMBDA','BRFOR','BRIOS','BRIBB','BRITJ','BRMAO','BRNAT','BRRIG','BRSSA','BRSUA','BZBZE','CAHAL','CAMTR','CANWE','CAPRR','CASQA','CATOR','CAVAN','CKAIT','CKRAR','CMDLA','CMKBI','COBAQ','COBUN','COCTG','COSMR','CUMOA','CUSCU','CVPAL','CVRAI','CVSAR','DEBRE','DEBRV','DEHAM','DELBC','DETRV','DJJIB','DKAAL','DKEBJ','DKFRC','DKGRE','DKHUN','DKSKA','DMRSU','DOBCC','DOPOP','DZMOS','DZORN','EGEDK','EGPSD','ESALG','ESALC','ESBCN','ESCAD','ESCEU','ESHUV','ESFUE','ESSCT','ESSDR','ESSVQ','ESTAR','ESVLC','ESVGO','FIHKO','FIHKO','FIHEL','FIHEL','FIVKO','FIVKO','GALBV','GAPOG','GBBLY','GBBRS','GBDVR','GBFXT','GBFOY','GBHRW','GBPOO','GBPME','GBSCR','GBSHS','GBSOU','GBTIL','GDSTG','GEBUS','GEPTI','GHTKD','GHTEM','GIGIB','GLJHS','GMBJL','GNCKY','GQBSG','GQSSG','GTPBR','GYGEO','HKHKG','HNPCA','HNPCR','HNSLO','HTPAP','IDBDJ','IDBLW','IDBIT','IDGTO','IDKDI','IDLUW','IDMES','IDPLM','IDPNJ','IDPNK','IDSRI','IDSOQ','IDTRK','IDTLI','IEORK','IEDUB','ILASH','INENR','INHAL','INKRI','INIXE','INMUN','INIXZ','IQALF','IQBSR','ISGRF','ISRFJ','ITMDC','ITMNF','ITPOZ','ITRAN','ITSAL','ITTRS','JMKIN','JMMBJ','JPABU','JPAXT','JPCHB','JPFKY','JPHHE','JPHIJ','JPHTC','JPHSM','JPIMB','JPIMI','JPIWK','JPKNZ','JPKSM','JPKWS','JPKCZ','JPKMJ','JPMAI','JPMYJ','JPMII','JPMIZ','JPMUR','JPNGS','JPNGO','JPNAH','JPNAO','JPKIJ','JPOIT','JPOMZ','JPONA','JPOTK','JPOTR','JPSMN','JPSKT','JPSBS','JPSMZ','JPTAK','JPTKS','JPTKY','JPTMK','JPTHS','JPTRG','JPUBJ','JPWAK','JPYAT','JPYKK','KEMBA','KITRW','KMYVA','LBKYE','LTKLJ','LVRIX','LYBEN','LYMRA','LYTIP','MAAGA','MANDR','MAPTM','MGDIE','MGMJN','MGTMM','MGTLE','MHKWA','MMRGN','MMRGN','MQFDF','MRNDB','MRNKC','MSPLY','MUPLU','MYBTU','MYBKI','MYKCH','MYLBU','MYMKZ','MYPGU','MYSDK','MYSBW','MYTWU','MZBEW','MZMPM','MZMNC','MZUEL','NAWVB','NGAPP','NGCBQ','NGLOS','NGPHC','NICIO','NOGJM','OMSLL','OMSOH','PAPAM','PABLB','PACSO','PAMIT','PECLL','PEILQ','PEIQT','PEMRI','PEPAI','PEPIO','PGGUR','PGBUA','PGKIM','PGLAE','PGPOM','PGRAB','PGWWK','PHBCD','PHCGY','PHCEB','PHCBO','PHDGT','PHMNL','PHOZC','PHPLC','PHPPS','PHSFS','PHTAG','PHZAM','PKGWD','PKKHI','PLGDN','PLSZZ','PWROR','RUARH','RUDUD','RUKGD','RUKOR','RUGDX','RUPKC','RUVVO','SAJUB','SCPOV','SDPZU','SEHEL','SEVAG','SGSIN','SIKOP','SLFNA','SNDKR','SOBBO','SOKMU','SOMGQ','SRPBM','SRPBM','SVAQJ','SVSAL','TGLFW','THSRI','TNBIZ','TNSFA','TNSUS','TNTUN','TRALI','TRDRC','TRHAY','TRYAR','USANC','USBPT','USBOS','USBCK','USCAT','USCHS','USCAV','USCRP','USDUT','USPAE','USFEP','USGLS','USGLC','USIJX','USADQ','USLAX','USMIA','USMOB','USMRH','USMSY','USPFN','USPWM','USPDX','USSAV','USSEA','USTIW','USTPA','USVAN','USPBI','USILG','UYMVD','VICHA','VNHPH','VUVLI','VUSAN','WSAPW','YEADE','YEMKX','ZAELS','ZAPLZ','ZARCB'],
-          TARGET_IATA=['HIR','POM','KEF','YEG','YHZ','YOW','YQB','YUL','YVR','YWG','YYC','YYT','YYZ','ALG','ACC','ABV','LOS','NIM','TUN','BRU','BER','FRA','HAM','CGN','DUS','MUC','LEJ','STR','HAJ','TLL','HEL','BFS','BHX','MAN','LTN','LGW','LHR','GLA','EDI','STN','AMS','EIN','DUB','SNN','BLL','CPH','LUX','BGO','OSL','TOS','TRD','SVG','GDN','KRK','WAW','GOT','ARN','RIX','VNO','CPT','DUR','JNB','GBE','SHO','MRU','LUN','RUN','TNR','LAD','TMS','MPM','SEZ','NDJ','HRE','WDH','FIH','BKO','BJL','FUE','LPA','ACE','TFS','FNA','ROB','AGA','FEZ','RBA','CMN','RAK','TNG','DSS','NKC','SID','RAI','ADD','JIB','CAI','HRG','HMB','SSH','JUB','NBO','MBA','MJI','KGL','KRT','DAR','ZNZ','EBB','NMI','ABQ','ATL','AUS','BDL','BNA','BOS','BUF','BWI','CLE','CLT','CMH','CVG','DCA','DEN','DFW','DTW','EWR','FLL','IAD','IAH','IND','JAX','JFK','LAS','LAX','LGA','MCI','MCO','MDW','MEM','MIA','MKE','MSP','MSY','OAK','OKC','OMA','ONT','ORD','ORF','PBI','PDX','PHL','PHX','PIT','PVD','PWM','RDU','RIC','RNO','RSW','SAN','SAT','SAV','SDF','SEA','SFB','SFO','SJC','SLC','SMF','SNA','SRQ','STL','SYR','TPA','TUL','TIA','BOJ','SOF','VAR','LCA','ZAG','ALC','BCN','IBZ','MAD','AGP','PMI','SCQ','BOD','TLS','LYS','MRS','NCE','CDG','ORY','BSL','ATH','HER','SKG','BUD','BRI','BDS','CTA','PMO','CAG','MXP','BGY','TRN','GOA','BLQ','VRN','VCE','FCO','NAP','PSA','FLR','LJU','PRG','TLV','ETM','MLA','VIE','FAO','FNC','PDL','OPO','LIS','SJJ','OTP','GVA','ZRH','ESB','AYT','ADB','DLM','COV','BJV','SAW','IST','SKP','GIB','BEG','TGD','BTS','PLS','LRM','PUJ','SDQ','GUA','KIN','CZM','DGO','GDL','MID','MEX','MTY','MZT','PVR','SJD','NLU','TIJ','CUN','PTY','LIR','SJO','SAL','PAP','HAV','VRA','GCM','NAS','BZE','PPT','VLI','AKL','CHC','WLG','BAH','DMM','JED','MED','RUH','IKA','THR','MHD','SYZ','AMM','KWI','BEY','DQM','AUH','DXB','DWC','SHJ','MCT','ISB','KHI','LHE','BGW','DOH','ANC','GUM','HNL','OGG','KHH','TPE','NRT','KIX','CTS','FUK','KOJ','NGO','ITM','SDJ','HND','MWX','CJU','PUS','ICN','GMP','OKA','MNL','DVO','CEB','AEP','EZE','BEL','BSB','CNF','MAO','FLN','FOR','GIG','GRU','BPS','SSA','VIX','SCL','GYE','UIO','ASU','ENO','AGT','BOG','VVI','PBM','CAY','LIM','CUZ','MVD','BLA','CCS','FDF','PTP','SJU','UVF','AUA','BON','CUR','SXM','ALA','NQZ','FRU','GYD','EVN','TBS','VVO','KBP','LWO','MSQ','KJA','OVB','ROV','AER','SVX','ASB','TAS','ZIA','SVO','VKO','KZN','GSV','UFA','KUF','BOM','CMB','HRI','PNH','SAI','CCU','DAC','HKG','DEL','MFM','KTM','BLR','COK','GOX','GOI','HYD','MAA','TRV','MLE','DMK','BKK','CNX','HKT','HAN','SGN','MDL','RGN','UPG','DPS','DJJ','BPN','SUB','BWN','CGK','KNO','KUL','SIN','BNE','MEL','ADL','DRW','PER','SYD','PEK','PKX','HET','TSN','TYN','CAN','CSX','KWL','NNG','SZX','CGO','EHU','WUH','HAK','SYX','FNJ','LHW','XIY','UBN','KMG','XMN','KHN','FOC','HGH','TNA','NGB','NKG','PVG','TAO','SHA','WNZ','YNT','CKG','KWE','TFU','CTU','URC','CGQ','DLC','SHE'];
+    const TARGET_WPI=['AEAUH','AERUW','AEKLF','AEMKH','AEKHL','AEQIW','AGSJO','ARBHI','ARBUE','ARMDQ','ARPUD','ARPMY','ARROS','ARSAE','ARUSH','ARZAE','ASPPG','AUADL','AUBNE','AUDRW','AUMEL','AUSYD','AWBAR','BDCGP','BEANR','BEGNE','BEZEE','BHMIN','BQKRA','BRIGI','BRIOA','BRNVT','BRPNG','BRPEC','BRRIO','BRMCP','BRSSZ','BRSLZ','BRVIX','BSNAS','BZBGK','CANWP','CASJB','CASJF','CDBNW','CGPNR','CIABJ','CISPY','CLANF','CLARI','CLCNL','CLIQQ','CLLQN','CLMJS','CLPAG','CLPUQ','CLSAI','CLSVE','CLVAP','CNCFD','CNDCB','CNDGG','CNDJK','CNFQG','CNHUI','CNHMN','CNJGY','CNJNZ','CNLYG','CNNSA','CNNTG','CNSHP','CNQZJ','CNRZH','CNSHK','CNSHD','CNWIH','CNWEF','CNWEI','CNYPG','CNYTN','CNYIK','CNZJG','CNZZU','CNZUH','COLET','COTLU','COTRB','CRCAL','CRMOB','CRLIO','CUMAR','CVMIN','CWWIL','CXFFC','CYLMS','DEBKE','DECUX','DEEME','DEKEL','DERSK','DEWVN','DKAAR','DKCPH','DOCAU','DOMAN','DZALG','DZAZW','DZGHZ','ECESM','ECGYE','ECPSJ','ECPBO','EEKND','EEMUG','EEPLA','EETLL','EGDAM','EGALY','EGSOK','ERMSW','ESLEI','ESBIO','ESCAR','ESCAS','ESFRO','ESGIJ','ESACE','ESLPA','ESAGP','ESMLN','ESSAG','ESSPC','ESVIL','FITKU','FITKU','FIPOR','FIPOR','FIHMN','FIHMN','FIPRS','FIPRS','FIKOK','FIKOK','FIKEM','FIKEM','FIKTK','FIRAU','FIRAU','FITOR','FITOR','FJLTK','FJSUV','FOKOL','FOTHO','FRBAS','FRBES','FRDKK','FRFOS','FRLPE','FRLRH','FRLEH','FRMRS','FRMTX','FRPOV','FRRAD','FRURO','FRSET','FRTLN','GBABD','GBBEL','GBGRG','GBGRK','GBHUL','GBIMM','GBLIV','GBLGP','GBTEE','GBTYN','GFDDC','GLGOH','GPPTP','GRHER','GRHER','GRPIR','GRSKG','GRVOL','GTSTC','GUPIT','GWOXB','HRPLE','HRRJK','HRSPU','HTCAP','HTLFF','IDBPN','IDBTM','IDBEN','IDBOA','IDJKT','IDDJJ','IDKUM','IDMAK','IDPDG','IDPER','IDSRG','IDSUB','IDTNJ','IDTMK','IDTUA','IEWAT','ILHFA','INMAA','INCOK','INHZR','INIXY','INKTP','INCCU','INMRM','INMRM','INBOM','INPRT','INPAV','INTUT','INVTZ','IQUQR','IRASA','IRBND','IRBKM','IRBUZ','ISREY','ITAOI','ITBRI','ITCAG','ITCTA','ITCVV','ITGOA','ITGIT','ITSPE','ITLIV','ITNAP','ITOLB','ITPMO','ITSVN','ITTPS','ITVDL','ITVCE','JOAQJ','JPHTD','JPISS','JPKKJ','JPUKB','JPMJR','JPMOJ','JPOSA','JPSEN','JPTYO','JPYOK','KHKOS','KMMUT','KNCHA','KRPUS','KRTSN','KRTJI','KRKUV','KRKAN','KRINC','KRMAS','KRMOK','KRKPO','KRPTK','KRUSN','KWSAA','KWSWK','KYGEC','LBBEY','LCCAS','LKCMB','LRMLW','LYKHO','MACAS','MDGIU','MEBAR','MGEHL','MGNOS','MHMAJ','MMTLA','MMTLA','MTMAR','MUPMA','MVMLE','MXATM','MXCOA','MXESE','MXGYM','MXLZC','MXZLO','MXMZT','MXPRO','MXPMD','MXPMS','MXTAM','MXTUX','MXVER','MYPEN','MYPKG','MYTPP','NALUD','NCNOU','NCNOU','NGLKK','NGONN','NIRAM','NLAMS','NLBOT','NLIJM','NLMOE','NLRTM','NLTNZ','NLVLI','NOAES','NOARD','NOAVE','NOBGO','NOBOO','NOBVK','NODRM','NOEGE','NOFRO','NOFRK','NOFUS','NOGLO','NOHFT','NOHRD','NOHAU','NOHVI','NOHLA','NOHYR','NOHOY','NOIKR','NOKRS','NOLAR','NOMAY','NOMOL','NOMJF','NOMSS','NOODD','NOORK','NOOSL','NOSAT','NOSVG','NOSKN','NOSUN','NOSVE','NOSVJ','NOTAE','NOTOS','NOTRD','NRINU','NZAKL','NZBLU','NZLYT','NZMAP','NZNPE','NZNSN','NZPOE','NZTRG','NZTIU','NZWLG','PAONX','PACTB','PAPTY','PAROD','PFBOB','PFPPT','PGMAG','PGMTK','PHBTG','PHGES','PHTGO','PLGDY','PLSWI','PRSJU','PTCNL','PTFDF','PTHOR','PTLEI','PTLIS','PTPIC','PTPDL','PTPXO','PTPRG','PTPRV','PTSCF','PTSET','PTSIE','PTVEL','PTVDP','PYASU','QAHMD','QAMES','ROCND','RUBRK','RUNVS','RULED','RUULU','RUVYP','RUZAR','SADMM','SAJED','SAKAC','SAYNB','SEAHU','SEGVX','SEGOT','SEHAD','SEKSD','SENRK','SEOSK','SEOXE','SEPIT','SESOE','SESTO','SESDL','SEUME','SEVST','SYLTK','SYTTS','THBKK','THLCH','THHKT','THSCS','TLDIL','TOTBU','TRPAM','TRAYT','TRBDM','TRELI','TREYP','TRGEB','TRGEM','TRISK','TRIZM','TRIZT','TRKMX','TRLMA','TRMAD','TRMER','TRSSX','TRTEK','TRTZX','TRYPO','TTPOS','TTPOS','TWTPE','TZDAR','UAILK','UAODS','UAYUZ','USBAL','USACL','USEPI','USFEB','USGFP','USHNL','USHKA','USLGB','USNYC','USNFF','USKND','USPDP','USPEF','USNTD','USPME','USSAN','USSCK','USILM','UYPTP','VCKTN','VEPLA','VICTD','VNC8Q','VNDAD','VNSGN','VNNGH','VNUIH','VNVUT','WFFUT','YTLON','ZACPT','ZAZBA','ZADUR','AEAJM','AEJEA','AIAXA','ALDRZ','ALDRZ','AOCAB','AOLOB','AOLAD','AOMAL','AOMSZ','AOSZA','AUBEL','AUBWT','AUCNS','AUDAM','AUDPO','AUFRE','AUGEX','AUNTL','AUPBT','AUPKL','AUTSV','AUWEI','AWORJ','BBBGI','BDMGL','BGBOJ','BGVAR','BJCOO','BMBDA','BRFOR','BRIOS','BRIBB','BRITJ','BRMAO','BRNAT','BRRIG','BRSSA','BRSUA','BZBZE','CAHAL','CAMTR','CANWE','CAPRR','CASQA','CATOR','CAVAN','CKAIT','CKRAR','CMDLA','CMKBI','COBAQ','COBUN','COCTG','COSMR','CUMOA','CUSCU','CVPAL','CVRAI','CVSAR','DEBRE','DEBRV','DEHAM','DELBC','DETRV','DJJIB','DKAAL','DKEBJ','DKFRC','DKGRE','DKHUN','DKSKA','DMRSU','DOBCC','DOPOP','DZMOS','DZORN','EGEDK','EGPSD','ESALG','ESALC','ESBCN','ESCAD','ESCEU','ESHUV','ESFUE','ESSCT','ESSDR','ESSVQ','ESTAR','ESVLC','ESVGO','FIHKO','FIHKO','FIHEL','FIHEL','FIVKO','FIVKO','GALBV','GAPOG','GBBLY','GBBRS','GBDVR','GBFXT','GBFOY','GBHRW','GBPOO','GBPME','GBSCR','GBSHS','GBSOU','GBTIL','GDSTG','GEBUS','GEPTI','GHTKD','GHTEM','GIGIB','GLJHS','GMBJL','GNCKY','GQBSG','GQSSG','GTPBR','GYGEO','HKHKG','HNPCA','HNPCR','HNSLO','HTPAP','IDBDJ','IDBLW','IDBIT','IDGTO','IDKDI','IDLUW','IDMES','IDPLM','IDPNJ','IDPNK','IDSRI','IDSOQ','IDTRK','IDTLI','IEORK','IEDUB','ILASH','INENR','INHAL','INKRI','INIXE','INMUN','INIXZ','IQALF','IQBSR','ISGRF','ISRFJ','ITMDC','ITMNF','ITPOZ','ITRAN','ITSAL','ITTRS','JMKIN','JMMBJ','JPABU','JPAXT','JPCHB','JPFKY','JPHHE','JPHIJ','JPHTC','JPHSM','JPIMB','JPIMI','JPIWK','JPKNZ','JPKSM','JPKWS','JPKCZ','JPKMJ','JPMAI','JPMYJ','JPMII','JPMIZ','JPMUR','JPNGS','JPNGO','JPNAH','JPNAO','JPKIJ','JPOIT','JPOMZ','JPONA','JPOTK','JPOTR','JPSMN','JPSKT','JPSBS','JPSMZ','JPTAK','JPTKS','JPTKY','JPTMK','JPTHS','JPTRG','JPUBJ','JPWAK','JPYAT','JPYKK','KEMBA','KITRW','KMYVA','LBKYE','LTKLJ','LVRIX','LYBEN','LYMRA','LYTIP','MAAGA','MANDR','MAPTM','MGDIE','MGMJN','MGTMM','MGTLE','MHKWA','MMRGN','MMRGN','MQFDF','MRNDB','MRNKC','MSPLY','MUPLU','MYBTU','MYBKI','MYKCH','MYLBU','MYMKZ','MYPGU','MYSDK','MYSBW','MYTWU','MZBEW','MZMPM','MZMNC','MZUEL','NAWVB','NGAPP','NGCBQ','NGLOS','NGPHC','NICIO','NOGJM','OMSLL','OMSOH','PAPAM','PABLB','PACSO','PAMIT','PECLL','PEILQ','PEIQT','PEMRI','PEPAI','PEPIO','PGGUR','PGBUA','PGKIM','PGLAE','PGPOM','PGRAB','PGWWK','PHBCD','PHCGY','PHCEB','PHCBO','PHDGT','PHMNL','PHOZC','PHPLC','PHPPS','PHSFS','PHTAG','PHZAM','PKGWD','PKKHI','PLGDN','PLSZZ','PWROR','RUARH','RUDUD','RUKGD','RUKOR','RUGDX','RUPKC','RUVVO','SAJUB','SCPOV','SDPZU','SEHEL','SEVAG','SGSIN','SIKOP','SLFNA','SNDKR','SOBBO','SOKMU','SOMGQ','SRPBM','SRPBM','SVAQJ','SVSAL','TGLFW','THSRI','TNBIZ','TNSFA','TNSUS','TNTUN','TRALI','TRDRC','TRHAY','TRYAR','USANC','USBPT','USBOS','USBCK','USCAT','USCHS','USCAV','USCRP','USDUT','USPAE','USFEP','USGLS','USGLC','USIJX','USADQ','USLAX','USMIA','USMOB','USMRH','USMSY','USPFN','USPWM','USPDX','USSAV','USSEA','USTIW','USTPA','USVAN','USPBI','USILG','UYMVD','VICHA','VNHPH','VUVLI','VUSAN','WSAPW','YEADE','YEMKX','ZAELS','ZAPLZ','ZARCB'];
+    const TARGET_IATA=['HIR','POM','KEF','YEG','YHZ','YOW','YQB','YUL','YVR','YWG','YYC','YYT','YYZ','ALG','ACC','ABV','LOS','NIM','TUN','BRU','BER','FRA','HAM','CGN','DUS','MUC','LEJ','STR','HAJ','TLL','HEL','BFS','BHX','MAN','LTN','LGW','LHR','GLA','EDI','STN','AMS','EIN','DUB','SNN','BLL','CPH','LUX','BGO','OSL','TOS','TRD','SVG','GDN','KRK','WAW','GOT','ARN','RIX','VNO','CPT','DUR','JNB','GBE','SHO','MRU','LUN','RUN','TNR','LAD','TMS','MPM','SEZ','NDJ','HRE','WDH','FIH','BKO','BJL','FUE','LPA','ACE','TFS','FNA','ROB','AGA','FEZ','RBA','CMN','RAK','TNG','DSS','NKC','SID','RAI','ADD','JIB','CAI','HRG','HMB','SSH','JUB','NBO','MBA','MJI','KGL','KRT','DAR','ZNZ','EBB','NMI','ABQ','ATL','AUS','BDL','BNA','BOS','BUF','BWI','CLE','CLT','CMH','CVG','DCA','DEN','DFW','DTW','EWR','FLL','IAD','IAH','IND','JAX','JFK','LAS','LAX','LGA','MCI','MCO','MDW','MEM','MIA','MKE','MSP','MSY','OAK','OKC','OMA','ONT','ORD','ORF','PBI','PDX','PHL','PHX','PIT','PVD','PWM','RDU','RIC','RNO','RSW','SAN','SAT','SAV','SDF','SEA','SFB','SFO','SJC','SLC','SMF','SNA','SRQ','STL','SYR','TPA','TUL','TIA','BOJ','SOF','VAR','LCA','ZAG','ALC','BCN','IBZ','MAD','AGP','PMI','SCQ','BOD','TLS','LYS','MRS','NCE','CDG','ORY','BSL','ATH','HER','SKG','BUD','BRI','BDS','CTA','PMO','CAG','MXP','BGY','TRN','GOA','BLQ','VRN','VCE','FCO','NAP','PSA','FLR','LJU','PRG','TLV','ETM','MLA','VIE','FAO','FNC','PDL','OPO','LIS','SJJ','OTP','GVA','ZRH','ESB','AYT','ADB','DLM','COV','BJV','SAW','IST','SKP','GIB','BEG','TGD','BTS','PLS','LRM','PUJ','SDQ','GUA','KIN','CZM','DGO','GDL','MID','MEX','MTY','MZT','PVR','SJD','NLU','TIJ','CUN','PTY','LIR','SJO','SAL','PAP','HAV','VRA','GCM','NAS','BZE','PPT','VLI','AKL','CHC','WLG','BAH','DMM','JED','MED','RUH','IKA','THR','MHD','SYZ','AMM','KWI','BEY','DQM','AUH','DXB','DWC','SHJ','MCT','ISB','KHI','LHE','BGW','DOH','ANC','GUM','HNL','OGG','KHH','TPE','NRT','KIX','CTS','FUK','KOJ','NGO','ITM','SDJ','HND','MWX','CJU','PUS','ICN','GMP','OKA','MNL','DVO','CEB','AEP','EZE','BEL','BSB','CNF','MAO','FLN','FOR','GIG','GRU','BPS','SSA','VIX','SCL','GYE','UIO','ASU','ENO','AGT','BOG','VVI','PBM','CAY','LIM','CUZ','MVD','BLA','CCS','FDF','PTP','SJU','UVF','AUA','BON','CUR','SXM','ALA','NQZ','FRU','GYD','EVN','TBS','VVO','KBP','LWO','MSQ','KJA','OVB','ROV','AER','SVX','ASB','TAS','ZIA','SVO','VKO','KZN','GSV','UFA','KUF','BOM','CMB','HRI','PNH','SAI','CCU','DAC','HKG','DEL','MFM','KTM','BLR','COK','GOX','GOI','HYD','MAA','TRV','MLE','DMK','BKK','CNX','HKT','HAN','SGN','MDL','RGN','UPG','DPS','DJJ','BPN','SUB','BWN','CGK','KNO','KUL','SIN','BNE','MEL','ADL','DRW','PER','SYD','PEK','PKX','HET','TSN','TYN','CAN','CSX','KWL','NNG','SZX','CGO','EHU','WUH','HAK','SYX','FNJ','LHW','XIY','UBN','KMG','XMN','KHN','FOC','HGH','TNA','NGB','NKG','PVG','TAO','SHA','WNZ','YNT','CKG','KWE','TFU','CTU','URC','CGQ','DLC','SHE'];
 
-    /* ───────── Runtime state ───────── */
+    /* ---------- Runtime ---------- */
     let wpiPorts=[],airports=[],waypoints=[],wpMarkers=[];
-    let lastMode,lastO,lastD,lastDist=0,lastEmis=0;     // lastEmis in t-CO₂e
-    let hubO='',hubD='';
+    let lastMode,lastO,lastD,lastDist=0,lastEmis=0,hubO='',hubD='';
     const routeLog=[];let currentLogIndex=-1;
 
-    /* ───────── CSV helpers ───────── */
+    /* ---------- CSV helpers ---------- */
     const esc=s=>`"${String(s).replace(/"/g,'""')}"`;
     const pushLog=mode=>{
-      routeLog.push({time:new Date().toISOString(),mode,
-        origin:origIn.value,dest:destIn.value,
-        hubO:'',hubD:'',cargo:cargoIn.value,unit:cargoUnit.value,dist:'',co2:''});
+      routeLog.push({time:new Date().toISOString(),mode,origin:origIn.value,dest:destIn.value,
+                     hubO:'',hubD:'',cargo:cargoIn.value,unit:cargoUnit.value,dist:'',co2:''});
       currentLogIndex=routeLog.length-1;
     };
     function updateLog(){
       if(currentLogIndex<0)return;
-      Object.assign(routeLog[currentLogIndex],{
-        hubO,hubD,dist:lastDist.toFixed(2),co2:lastEmis.toFixed(2)
-      });
+      Object.assign(routeLog[currentLogIndex],{hubO,hubD,dist:lastDist.toFixed(2),co2:lastEmis.toFixed(2)});
       downloadBtn.disabled=false;
     }
     function downloadCsv(){
       if(!routeLog.length)return;
       const head='Timestamp,Mode,Origin,Destination,HubOrigin,HubDestination,Cargo,Unit,Distance_km,CO2e_t';
-      const rows=routeLog.map(r=>[
-        r.time,r.mode,esc(r.origin),esc(r.dest),r.hubO,r.hubD,r.cargo,r.unit,r.dist,r.co2
-      ].join(','));
+      const rows=routeLog.map(r=>[r.time,r.mode,esc(r.origin),esc(r.dest),r.hubO,r.hubD,r.cargo,r.unit,r.dist,r.co2].join(','));
       const csv='\uFEFF'+[head,...rows].join('\n');
-      const blob=new Blob([csv],{type:'text/csv'});
       const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);a.download='route_log.csv';a.click();
-      URL.revokeObjectURL(a.href);
+      a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+      a.download='route_log.csv';a.click();URL.revokeObjectURL(a.href);
     }
     downloadBtn.onclick=downloadCsv;
 
-    /* ───────── Load static data ───────── */
+    /* ---------- Load static data ---------- */
     fetch(WPI_URL).then(r=>r.json()).then(o=>{
-      TARGET_WPI.forEach(code=>{
-        const p=o[code];if(!p?.coordinates)return;
+      for(const [code,p] of Object.entries(o)){
+        if(!p?.coordinates)continue;
         const [lon,lat]=p.coordinates;
         wpiPorts.push({code,name:p.name,coords:[lat,lon]});
-        L.circleMarker([lat,lon],{radius:5,color:'darkgreen',fillColor:'lightgreen'})
-          .bindTooltip(`${p.name} (${code})`).addTo(layers.seaPort);
-      });
+        if(TARGET_WPI.includes(code)){
+          L.circleMarker([lat,lon],{radius:5,color:'darkgreen',fillColor:'lightgreen'})
+            .bindTooltip(`${p.name} (${code})`).addTo(layers.seaPort);
+        }
+      }
     });
     fetch(LANE_URL).then(r=>r.json()).then(j=>{
       const fc=[];
@@ -204,103 +154,56 @@
         c.geometry.coordinates=c.geometry.coordinates.map(seg=>seg.map(pt=>[pt[0]+shift,pt[1]]));
         fc.push(c);
       }));
-      L.geoJSON({type:'FeatureCollection',features:fc},{style:{color:'#0074d9',weight:1,opacity:.7},noClip:true})
-        .addTo(layers.lane);
+      L.geoJSON({type:'FeatureCollection',features:fc},{style:{color:'#0074d9',weight:1,opacity:.7},noClip:true}).addTo(layers.lane);
     });
     fetch(AIR_URL).then(r=>r.json()).then(o=>{
-      Object.values(o).forEach(a=>{
-        const code=(a.iata||'').toUpperCase();if(!TARGET_IATA.includes(code))return;
+      for(const a of Object.values(o)){
+        const code=(a.iata||'').toUpperCase();if(!code)continue;
         airports.push({code,name:a.name,coords:[+a.lat,+a.lon]});
-        L.circleMarker([+a.lat,+a.lon],{radius:5,color:'orange',fillColor:'#ffa500'})
-          .bindTooltip(`${a.name} (${code})`).addTo(layers.airport);
-      });
+        if(TARGET_IATA.includes(code)){
+          L.circleMarker([+a.lat,+a.lon],{radius:5,color:'orange',fillColor:'#ffa500'})
+            .bindTooltip(`${a.name} (${code})`).addTo(layers.airport);
+        }
+      }
     });
 
-    /* ───────── Utility fns ───────── */
-    const adjustAM=c=>{
-      const out=[c[0]];let prev=c[0][1];
-      c.slice(1).forEach(([la,lo])=>{
-        if(lo-prev>180)lo-=360;if(lo-prev<-180)lo+=360;
-        out.push([la,lo]);prev=lo;
-      });return out;
-    };
-    const gc=(φ1,λ1,φ2,λ2,n=200)=>{
-      const R=Math.PI/180,p1=φ1*R,l1=λ1*R,p2=φ2*R,l2=λ2*R;
-      const Δσ=2*Math.asin(Math.sqrt(Math.sin((p2-p1)/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin((l2-l1)/2)**2));
-      const pts=[];
-      for(let i=0;i<=n;i++){
-        const f=i/n,
-              A=Math.sin((1-f)*Δσ)/Math.sin(Δσ),
-              B=Math.sin(f*Δσ)/Math.sin(Δσ),
-              x=A*Math.cos(p1)*Math.cos(l1)+B*Math.cos(p2)*Math.cos(l2),
-              y=A*Math.cos(p1)*Math.sin(l1)+B*Math.cos(p2)*Math.sin(l2),
-              z=A*Math.sin(p1)+B*Math.sin(p2),
-              φ=Math.atan2(z,Math.hypot(x,y)),
-              λ=Math.atan2(y,x);
-        pts.push([φ/R,λ/R]);
-      }
-      return pts;
-    };
-    const findNearest=(arr,pt)=>{
-      let best=null,bd=Infinity;
-      arr.forEach(o=>{
-        const d=turf.distance(turf.point([pt[1],pt[0]]),turf.point([o.coords[1],o.coords[0]]),{units:'kilometers'});
-        if(d<bd){bd=d;best=o;}
-      });return best;
-    };
-    const geocode=async q=>{
-      const j=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`).then(r=>r.json());
-      if(!j.length)throw'Address not found';
-      return[+j[0].lat,+j[0].lon];
-    };
-    const routeLand=async(a,b,layer)=>{
-      const j=await fetch(`https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?geometries=geojson`).then(r=>r.json());
-      if(j.code!=='Ok')throw'Land route search failed';
-      L.geoJSON(j.routes[0].geometry,{color:'green',weight:4}).addTo(layer);
-      return j.routes[0].distance/1000;
-    };
-    const cargoTon=()=>{
-      const v=parseFloat(cargoIn.value);
-      if(isNaN(v)||v<=0){alert('Please enter a valid cargo amount');throw'Invalid'}
-      return cargoUnit.value==='ton'?v:v*10.5;
-    };
+    /* ---------- Helpers ---------- */
+    const adjustAM=c=>{const out=[c[0]];let prev=c[0][1];c.slice(1).forEach(([la,lo])=>{if(lo-prev>180)lo-=360;if(lo-prev<-180)lo+=360;out.push([la,lo]);prev=lo;});return out;};
+    const gc=(φ1,λ1,φ2,λ2,n=200)=>{const R=Math.PI/180,p1=φ1*R,l1=λ1*R,p2=φ2*R,l2=λ2*R,Δσ=2*Math.asin(Math.sqrt(Math.sin((p2-p1)/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin((l2-l1)/2)**2)),pts=[];for(let i=0;i<=n;i++){const f=i/n,A=Math.sin((1-f)*Δσ)/Math.sin(Δσ),B=Math.sin(f*Δσ)/Math.sin(Δσ),x=A*Math.cos(p1)*Math.cos(l1)+B*Math.cos(p2)*Math.cos(l2),y=A*Math.cos(p1)*Math.sin(l1)+B*Math.cos(p2)*Math.sin(l2),z=A*Math.sin(p1)+B*Math.sin(p2),φ=Math.atan2(z,Math.hypot(x,y)),λ=Math.atan2(y,x);pts.push([φ/R,λ/R]);}return pts;};
+    const findNearest=(arr,pt)=>arr.reduce((best,o)=>{const d=turf.distance(turf.point([pt[1],pt[0]]),turf.point([o.coords[1],o.coords[0]]),{units:'kilometers'});return d<(best.d??Infinity)?{d,obj:o}:{d:best.d,obj:best.obj};},{}).obj;
+    const geocode=async q=>{const j=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`).then(r=>r.json());if(!j.length)throw'Address not found';return[+j[0].lat,+j[0].lon];};
+    const routeLand=async(a,b,layer)=>{const j=await fetch(`https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?geometries=geojson`).then(r=>r.json());if(j.code!=='Ok')throw'Land route search failed';L.geoJSON(j.routes[0].geometry,{color:'green',weight:4}).addTo(layer);return j.routes[0].distance/1000;};
+    const cargoTon=()=>{const v=parseFloat(cargoIn.value);if(isNaN(v)||v<=0){alert('Please enter a valid cargo amount');throw'Invalid'}return cargoUnit.value==='ton'?v:v*10.5;};
 
-    /* ───────── Waypoints dbl-click ───────── */
+    /* ---------- Waypoints dbl-click ---------- */
     let lastClick=0,lastPt=null;
     map.getContainer().addEventListener('pointerdown',e=>{
       const now=Date.now(),pt=map.mouseEventToContainerPoint(e);
-      if(now-lastClick<400 && lastPt && lastPt.distanceTo(pt)<20){
-        const ll=map.containerPointToLatLng(pt);      /* correct point */
-        const idx=waypoints.findIndex(p=>Math.hypot(p[0]-ll.lat,p[1]-ll.lng)<0.1);
-        if(idx>=0){
-          map.removeLayer(wpMarkers[idx]);
-          waypoints.splice(idx,1);wpMarkers.splice(idx,1);
-        }else{
-          const mk=L.circleMarker([ll.lat,ll.lng],{radius:6,color:'purple'}).addTo(map)
-                   .bindTooltip(`${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`,{direction:'top'});
-          waypoints.push([ll.lat,ll.lng]);wpMarkers.push(mk);
-        }
+      if(now-lastClick<400&&lastPt&&lastPt.distanceTo(pt)<20){
+        const ll=map.containerPointToLatLng(pt);
+        const i=waypoints.findIndex(p=>Math.hypot(p[0]-ll.lat,p[1]-ll.lng)<0.1);
+        if(i>=0){map.removeLayer(wpMarkers[i]);waypoints.splice(i,1);wpMarkers.splice(i,1);}
+        else{const mk=L.circleMarker([ll.lat,ll.lng],{radius:6,color:'purple'}).addTo(map).bindTooltip(`${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`,{direction:'top'});waypoints.push([ll.lat,ll.lng]);wpMarkers.push(mk);}
         draw();
-      }
-      lastClick=now;lastPt=pt;
+      }lastClick=now;lastPt=pt;
     });
 
-    /* ───────── Draw & compute ───────── */
+    /* ---------- Draw ---------- */
     async function draw(){
       ['land1','seaRoute','airRoute','landRoute','land2','origDest'].forEach(k=>layers[k].clearLayers());
-      let dist=0,emis=0,cargo=cargoTon();
-      const add=(d,f)=>{dist+=d;emis+=d*cargo*f;};
-      hubO=hubD='';
+      let dist=0,emis=0,cargo=cargoTon();const add=(d,f)=>{dist+=d;emis+=d*cargo*f;};hubO=hubD='';
 
-      L.marker(lastO).bindTooltip(`${origIn.value}\n${lastO[0].toFixed(5)}, ${lastO[1].toFixed(5)}`).addTo(layers.origDest);
-      L.marker(lastD).bindTooltip(`${destIn.value}\n${lastD[0].toFixed(5)}, ${lastD[1].toFixed(5)}`).addTo(layers.origDest);
+      L.marker(lastO).addTo(layers.origDest).bindTooltip(`${origIn.value}\n${lastO[0].toFixed(5)}, ${lastO[1].toFixed(5)}`);
+      L.marker(lastD).addTo(layers.origDest).bindTooltip(`${destIn.value}\n${lastD[0].toFixed(5)}, ${lastD[1].toFixed(5)}`);
 
       try{
         if(lastMode==='sea'){
-          const sO=findNearest(wpiPorts,lastO),sD=findNearest(wpiPorts,lastD);
+          const codeO=origCode.value.trim().toUpperCase(),codeD=destCode.value.trim().toUpperCase();
+          const sO=(codeO&&wpiPorts.find(p=>p.code===codeO))||findNearest(wpiPorts,lastO);
+          const sD=(codeD&&wpiPorts.find(p=>p.code===codeD))||findNearest(wpiPorts,lastD);
           hubO=sO.code;hubD=sD.code;
-          lblOrig.textContent=`Nearest port: ${sO.name} (${sO.code})`;
-          lblDest.textContent=`Nearest port: ${sD.name} (${sD.code})`;
+          lblOrig.textContent=`Port: ${sO.name} (${sO.code})`;
+          lblDest.textContent=`Port: ${sD.name} (${sD.code})`;
           add(await routeLand(lastO,sO.coords,layers.land1),EF_ROAD);
           const pts=[sO.coords,...waypoints,sD.coords];
           for(let i=1;i<pts.length;i++){
@@ -311,10 +214,12 @@
           add(await routeLand(sD.coords,lastD,layers.land2),EF_ROAD);
 
         }else if(lastMode==='air'){
-          const aO=findNearest(airports,lastO),aD=findNearest(airports,lastD);
+          const codeO=origCode.value.trim().toUpperCase(),codeD=destCode.value.trim().toUpperCase();
+          const aO=(codeO&&airports.find(a=>a.code===codeO))||findNearest(airports,lastO);
+          const aD=(codeD&&airports.find(a=>a.code===codeD))||findNearest(airports,lastD);
           hubO=aO.code;hubD=aD.code;
-          lblOrig.textContent=`Nearest airport: ${aO.name} (${aO.code})`;
-          lblDest.textContent=`Nearest airport: ${aD.name} (${aD.code})`;
+          lblOrig.textContent=`Airport: ${aO.name} (${aO.code})`;
+          lblDest.textContent=`Airport: ${aD.name} (${aD.code})`;
           add(await routeLand(lastO,aO.coords,layers.land1),EF_ROAD);
           const pts=[aO.coords,...waypoints,aD.coords];
           for(let i=1;i<pts.length;i++){
@@ -324,33 +229,25 @@
           }
           add(await routeLand(aD.coords,lastD,layers.land2),EF_ROAD);
 
-        }else{ /* land */
-          lblOrig.textContent='Nearest: —';lblDest.textContent='Nearest: —';
-          add(await routeLand(lastO,lastD,layers.landRoute),EF_ROAD);
-        }
+        }else{lblOrig.textContent='Nearest: —';lblDest.textContent='Nearest: —';
+          add(await routeLand(lastO,lastD,layers.landRoute),EF_ROAD);}
       }catch{alert('Failed to build route.');return;}
 
       distEl.textContent=`Total distance: ${dist.toFixed(2)} km`;
       emisEl.textContent=`CO₂ emissions: ${(emis/1000).toFixed(2)} tCO₂e`;
-      lastDist=dist;lastEmis=emis/1000;
-      updateLog();
+      lastDist=dist;lastEmis=emis/1000;updateLog();
     }
 
-    /* ───────── Clear, Run search ───────── */
+    /* ---------- Reset & Search ---------- */
     const reset=()=>{['land1','seaRoute','airRoute','landRoute','land2','origDest'].forEach(k=>layers[k].clearLayers());
       wpMarkers.forEach(m=>map.removeLayer(m));waypoints=[];wpMarkers=[];};
 
-    clearWp.onclick=withSpin(async()=>{
-      reset();
-      await draw();
-    });
+    clearWp.onclick=withSpin(async()=>{reset();await draw();});
 
     const run=async mode=>{
       reset();lastMode=mode;
       lastO=await geocode(origIn.value);lastD=await geocode(destIn.value);
-      pushLog(mode);
-      await draw();
-      map.fitBounds([lastO,lastD],{padding:[40,40]});
+      pushLog(mode);await draw();map.fitBounds([lastO,lastD],{padding:[40,40]});
     };
     landBtn.onclick=withSpin(()=>run('land'));
     seaBtn.onclick =withSpin(()=>run('sea'));
