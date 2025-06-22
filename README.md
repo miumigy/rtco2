@@ -81,4 +81,4 @@ Each successful search appends (or updates) a row in an in-memory log:
 ---
 
 ## License
-Released under the MIT License. See LICENSE for details.
+Released under the MIT License. See [LICENSE](https://github.com/miumigy/rtco2/blob/main/LICENSE) for details.
